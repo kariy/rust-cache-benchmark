@@ -1,3 +1,4 @@
+use memory_stats::memory_stats;
 mod cache;
 mod result;
 
@@ -20,6 +21,9 @@ where
 {
     let hit_counter = Arc::new(Mutex::new(0u64));
     let total_ops = NUM_THREADS * OPS_PER_THREAD;
+
+    // Measure initial memory
+    let initial_mem = memory_stats().map(|stats| stats.physical_mem).unwrap_or(0);
     let start = Instant::now();
 
     (0..NUM_THREADS).into_par_iter().for_each(|thread_id| {
@@ -44,11 +48,19 @@ where
     let elapsed = start.elapsed();
     let hits = *hit_counter.lock();
 
+    // Drop unrelated objects to get more accurate memory reading
+    drop(hit_counter);
+
+    // Measure final memory
+    let final_mem = memory_stats().map(|stats| stats.physical_mem).unwrap_or(0);
+    let memory_used = final_mem.saturating_sub(initial_mem);
+
     BenchResult {
         name: name.to_string(),
         total_time: elapsed.as_millis(),
         ops_per_sec: total_ops as f64 / elapsed.as_secs_f64(),
         hit_rate: hits as f64 / total_ops as f64,
+        memory_mb: memory_used as f64 / 1024.0 / 1024.0,
     }
 }
 
