@@ -34,6 +34,24 @@ where
         let mut local_hits = 0;
 
         for i in 0..OPS_PER_THREAD {
+            // This key generation strategy is designed for testing cache behavior with specific characteristics:
+            //
+            // 1. **Thread Isolation**:
+            // - `thread_id * OPS_PER_THREAD` ensures each thread works on a different range of keys
+            // - Prevents thread contention by giving each thread its own key space
+            //
+            // 2. **Cache Size Testing**:
+            // - `% (CACHE_SIZE * 2)` creates a working set that's twice the cache size
+            // - This ensures some keys will be evicted, testing cache replacement policies
+            // - Creates a mix of cache hits and misses
+            //
+            // Example:
+            //
+            // If OPS_PER_THREAD = 5000 & CACHE_SIZE = 1000 :-
+            // Thread 0: keys 0-4999 % 2000
+            // Thread 1: keys 5000-9999 % 2000
+            // Thread 2: keys 10000-14999 % 2000
+
             let key = (i + thread_id * OPS_PER_THREAD) % (CACHE_SIZE * 2);
 
             if let Some(_) = cache.get_key(&key) {
