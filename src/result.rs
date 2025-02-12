@@ -8,6 +8,9 @@ pub struct BenchResult {
     pub hit_rate: f64,
     #[tabled(rename = "Ops/sec", format("{:.3}", self.ops_per_sec ))]
     pub ops_per_sec: f64,
+    /// Total number of entries in the cache.
+    #[tabled(rename = "Total Entries", format("{}", self.total_entries))]
+    pub total_entries: usize,
     /// The total time, in milliseconds, to execute all of the operations.
     #[tabled(rename = "Time (ms)")]
     pub total_time: u128,
