@@ -7,36 +7,45 @@ use parking_lot::Mutex;
 use quick_cache::sync::Cache as QuickCache;
 
 pub trait Cache {
-    fn get_key(&self, key: &usize) -> Option<String>;
-    fn set_key(&self, key: usize, value: String);
+    type Item: Clone;
+
+    fn get_key(&self, key: &usize) -> Option<Self::Item>;
+
+    fn set_key(&self, key: usize, value: Self::Item);
 }
 
-impl Cache for Arc<QuickCache<usize, String>> {
-    fn get_key(&self, key: &usize) -> Option<String> {
+impl<T: Clone> Cache for Arc<QuickCache<usize, T>> {
+    type Item = T;
+
+    fn get_key(&self, key: &usize) -> Option<Self::Item> {
         self.get(key)
     }
 
-    fn set_key(&self, key: usize, value: String) {
+    fn set_key(&self, key: usize, value: Self::Item) {
         self.insert(key, value);
     }
 }
 
-impl Cache for Arc<Mutex<LruCache<usize, String>>> {
-    fn get_key(&self, key: &usize) -> Option<String> {
+impl<T: Clone> Cache for Arc<Mutex<LruCache<usize, T>>> {
+    type Item = T;
+
+    fn get_key(&self, key: &usize) -> Option<Self::Item> {
         self.lock().get(key).cloned()
     }
 
-    fn set_key(&self, key: usize, value: String) {
+    fn set_key(&self, key: usize, value: Self::Item) {
         self.lock().put(key, value);
     }
 }
 
-impl Cache for Arc<Mutex<SizedCache<usize, String>>> {
-    fn get_key(&self, key: &usize) -> Option<String> {
+impl<T: Clone> Cache for Arc<Mutex<SizedCache<usize, T>>> {
+    type Item = T;
+
+    fn get_key(&self, key: &usize) -> Option<Self::Item> {
         self.lock().cache_get(key).cloned()
     }
 
-    fn set_key(&self, key: usize, value: String) {
+    fn set_key(&self, key: usize, value: Self::Item) {
         self.lock().cache_set(key, value);
     }
 }

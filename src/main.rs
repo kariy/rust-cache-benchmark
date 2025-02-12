@@ -15,9 +15,11 @@ use rayon::prelude::*;
 use result::BenchResult;
 use tabled::Table;
 
-fn bench_cache<C>(name: &str, cache: C) -> BenchResult
+fn bench_cache<C, F, T>(name: &str, cache: C, value_gen: F) -> BenchResult
 where
-    C: Cache + Clone + Send + Sync + 'static,
+    T: Clone,
+    F: Fn(usize) -> T + Send + Sync,
+    C: Cache<Item = T> + Clone + Send + Sync + 'static,
 {
     let hit_counter = Arc::new(Mutex::new(0u64));
     let total_ops = NUM_THREADS * OPS_PER_THREAD;
@@ -37,7 +39,8 @@ where
             if let Some(_) = cache.get_key(&key) {
                 local_hits += 1;
             } else {
-                cache.set_key(key, format!("value_{}", key));
+                let value = value_gen(key);
+                cache.set_key(key, value);
             }
         }
 
@@ -81,20 +84,21 @@ fn main() {
     println!("  Operations per thread: {}", OPS_PER_THREAD);
     println!();
 
+    // let json: Value = serde_json::from_str(include_str!("../fixtures/big.json")).unwrap();
+    let value = |key: usize| format!("value_{key}");
+
     let results = pool.install(|| {
-        vec![
-            bench_cache("quick_cache", Arc::new(QuickCache::new(CACHE_SIZE))),
-            bench_cache(
-                "lru",
-                Arc::new(Mutex::new(LruCache::new(
-                    NonZeroUsize::new(CACHE_SIZE).unwrap(),
-                ))),
-            ),
-            bench_cache(
-                "cached",
-                Arc::new(Mutex::new(SizedCache::with_size(CACHE_SIZE))),
-            ),
-        ]
+        let quick_cache = Arc::new(QuickCache::new(CACHE_SIZE));
+        let quick_cache_result = bench_cache("quick_cache", quick_cache, value);
+
+        let size = NonZeroUsize::new(CACHE_SIZE).unwrap();
+        let lru_cache = Arc::new(Mutex::new(LruCache::new(size)));
+        let lru_cache_result = bench_cache("lru", lru_cache, value);
+
+        let cached = Arc::new(Mutex::new(SizedCache::with_size(CACHE_SIZE)));
+        let cached_result = bench_cache("cached", cached, value);
+
+        vec![quick_cache_result, lru_cache_result, cached_result]
     });
 
     println!("Results:");
